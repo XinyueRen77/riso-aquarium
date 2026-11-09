@@ -1,0 +1,9 @@
+{
+  "name": "riso-aquarium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env.local dev.mjs"
+  },
+  "engines": { "node": ">=20" }
+}

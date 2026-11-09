@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Riso Aquarium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    } }
+  </script>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="stamp" aria-hidden="true"><i></i><i></i></span>
+      <div>
+        <h1>RISO AQUARIUM</h1>
+        <span class="sub">Living Print Studio · 3-Drum Press</span>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="info" class="btn">How it works</button>
+      <button id="save" class="btn" title="Download this conversation and every proof as JSON">Save session</button>
+      <button id="export" class="btn primary">Export print ↓</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="chat">
+      <div class="chat-head"><h2>The Printer</h2><span id="stage" class="pill">asking</span></div>
+      <div id="log" class="messages" aria-live="polite"></div>
+      <div class="quick" id="quick"></div>
+      <form id="form">
+        <textarea id="input" rows="2" placeholder="Describe the tank you want… (Enter to send)"></textarea>
+        <button id="send" class="btn primary" type="submit">Send</button>
+      </form>
+    </aside>
+
+    <section class="stage">
+      <div class="drums" id="drums"></div>
+      <figure class="print">
+        <canvas id="tank" aria-label="3D riso aquarium print. Drag to turn the tank, click the water to drop food."></canvas>
+        <figcaption>
+          <span id="title" class="print-title"></span>
+          <span class="swatches" id="swatches"></span>
+          <span id="colophon" class="colophon"></span>
+        </figcaption>
+      </figure>
+      <p class="hint">Drag to turn the tank · scroll to zoom · click the water to drop food</p>
+      <div class="row">
+        <div class="card">
+          <h3>Proofs <small>click to compare</small></h3>
+          <div id="proofs" class="proofs"><span class="empty">No proofs yet. Talk to the printer.</span></div>
+        </div>
+        <div class="card">
+          <h3>Press log <small>validator + model</small></h3>
+          <ol id="presslog" class="presslog"></ol>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="sys">
+    <h2>How this system works</h2>
+    <ol>
+      <li><b>You</b> type a wish. <i>enters the context</i></li>
+      <li><b>Server</b> adds the printer's system instructions + knowledge (inks, catalog, taste rules). <i>deterministic</i></li>
+      <li><b>The model</b> (via OpenRouter) completes the conversation: a reply and, when ready, a scene recipe as JSON. <i>probabilistic</i></li>
+      <li><b>Validator</b> clamps the recipe to the press: ≤3 inks, catalog items only, counts. Fixes appear in the press log. <i>deterministic</i></li>
+      <li><b>3D press</b> builds the tank, renders how much of each ink every spot gets, screens each drum as halftone dots, and overprints them off-register on paper. <i>deterministic</i></li>
+    </ol>
+    <p>The model never sees the picture it made, only its own recipe. You decide when the print is final.</p>
+    <form method="dialog"><button class="btn">Close</button></form>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
