@@ -1,5 +1,7 @@
 # Riso Aquarium
 
+**Live:** https://riso-aquarium.vercel.app · **Repo:** https://github.com/XinyueRen77/riso-aquarium
+
 一个 AI agent 扮演你（riso 印刷师）：和客人聊天，弄清楚他们想要什么样的水族箱，然后"印"出一张会动的 riso 水族箱，可以反复打样、修改，最后导出 PNG。
 
 - **Agent**（概率部分）：LLM（通过 OpenRouter，默认 Claude Haiku 5.5）只负责对话，并输出一份场景配方（JSON）。
