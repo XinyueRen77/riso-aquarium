@@ -8,9 +8,44 @@ import { INKS } from './riso.js';
 THREE.ColorManagement.enabled = false;
 
 const TONE = { light: 0.28, mid: 0.48, dense: 0.7, solid: 1 };
-const TANK = { w: 8, h: 4.6, d: 3.6 };
-const BOUNDS = { x: 3.4, z: 1.3, top: TANK.h - 0.5 };
-const sandAt = (x, z) => 0.5 + 0.12 * Math.sin(x * 1.3 + z * 0.7) + 0.07 * Math.sin(x * 3.1 - z * 2.3);
+// Tank shapes. Box: w x h x d. Round: radius r with `sides` (48 = cylinder, 6 = hexagon). Bowl: a sphere.
+const SHAPES = {
+  rectangle: { box: true, w: 8, h: 4.6, d: 3.6 },
+  tall: { box: true, w: 4.6, h: 6.2, d: 3.4 },
+  wide: { box: true, w: 11, h: 3.8, d: 3.2 },
+  cube: { box: true, w: 5.4, h: 5.4, d: 5.4 },
+  cylinder: { r: 3, h: 5.2, sides: 48 },
+  hexagon: { r: 3.2, h: 5, sides: 6 },
+  bowl: { r: 3.2, bowl: true },
+};
+let T; // the current tank, with derived floor / water / swim limits
+function useShape(name) {
+  T = { name, ...(SHAPES[name] || SHAPES.rectangle) };
+  if (T.bowl) Object.assign(T, { cy: T.r + 0.15, floor: 0.85, water: T.r + 0.15 + T.r * 0.55 });
+  else Object.assign(T, { floor: 0.5, water: T.h, ri: T.sides === 6 ? T.r * Math.cos(Math.PI / 6) : T.r });
+  T.top = T.water - 0.45;
+  T.width = T.box ? T.w : 2 * T.r;
+  T.height = T.bowl ? 2 * T.r + 0.15 : T.h;
+}
+useShape('rectangle');
+const sandAt = (x, z) => T.floor + 0.12 * Math.sin(x * 1.3 + z * 0.7) + 0.07 * Math.sin(x * 3.1 - z * 2.3);
+const radiusAt = (y) => (T.bowl ? Math.sqrt(Math.max(0, T.r * T.r - (y - T.cy) ** 2)) : T.ri);
+// Keep a point m units inside the glass.
+function clampIn(p, m) {
+  if (T.box) {
+    p.x = Math.max(-(T.w / 2 - m), Math.min(T.w / 2 - m, p.x));
+    p.z = Math.max(-(T.d / 2 - m), Math.min(T.d / 2 - m, p.z));
+    return;
+  }
+  const lim = Math.max(0.2, radiusAt(p.y) - m), d = Math.hypot(p.x, p.z);
+  if (d > lim) (p.x *= lim / d), (p.z *= lim / d);
+}
+const nearWall = (p) => (T.box ? Math.abs(p.x) > (T.w / 2 - 0.6) * 0.85 || Math.abs(p.z) > (T.d / 2 - 0.5) * 0.8 : Math.hypot(p.x, p.z) > (radiusAt(p.y) - 0.5) * 0.8);
+function randomIn(rand, y, m = 0.6) {
+  if (T.box) return [(rand() - 0.5) * (T.w - 2 * m), (rand() - 0.5) * (T.d - 2 * m)];
+  const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * Math.max(0.1, radiusAt(y) - m);
+  return [Math.cos(a) * r, Math.sin(a) * r];
+}
 const UP = new THREE.Vector3(0, 1, 0);
 const PAPER = '#F3EEE3';
 
@@ -108,7 +143,16 @@ export function createTank(canvas) {
   let world = null, actors = [], updaters = [], owned = [], current = null, food = null;
   const own = (g) => (owned.push(g), g);
 
+  function frame() {
+    const dist = Math.max(T.width * 1.5, T.height * 2.2);
+    controls.target.set(0, T.height * 0.47, 0);
+    camera.position.copy(controls.target).addScaledVector(new THREE.Vector3(-0.15, 0.17, 1).normalize(), dist);
+    Object.assign(controls, { minDistance: dist * 0.6, maxDistance: dist * 1.5 });
+    controls.update();
+  }
+
   function setScene(scene) {
+    if (!current || current.tank !== scene.tank) (useShape(scene.tank), frame());
     if (world) scene3d.remove(world);
     owned.forEach((g) => g.dispose());
     owned = [];
@@ -129,46 +173,22 @@ export function createTank(canvas) {
     post.uniforms.off1.value.set(off(), off());
     post.uniforms.off2.value.set(off(), off());
 
-    // tank: stand, rim, corner posts, sand, pebbles, water
-    const box = (w, h, d) => own(new THREE.BoxGeometry(w, h, d));
-    const stand = M(box(TANK.w + 0.4, 0.35, TANK.d + 0.4), D, 'solid', 0.4);
-    stand.position.y = -0.18;
-    const rim = M(box(TANK.w + 0.3, 0.12, TANK.d + 0.3), D, 'solid', 0.3);
-    rim.position.y = TANK.h;
-    world.add(stand, rim);
-    for (const x of [-1, 1]) for (const z of [-1, 1]) {
-      const post_ = M(box(0.07, TANK.h, 0.07), D, 'solid', 0);
-      post_.position.set((x * TANK.w) / 2, TANK.h / 2, (z * TANK.d) / 2);
-      world.add(post_);
-    }
-    const sandGeo = own(new THREE.BoxGeometry(TANK.w, 0.5, TANK.d, 48, 1, 24));
-    sandGeo.translate(0, 0.25, 0);
-    const pos = sandGeo.attributes.position;
-    for (let i = 0; i < pos.count; i++) if (pos.getY(i) > 0.4) pos.setY(i, sandAt(pos.getX(i), pos.getZ(i)));
-    sandGeo.computeVertexNormals();
-    world.add(M(sandGeo, scene.ground.ink, scene.ground.tone, 0.35));
+    buildTank({ M, own, D }, world, scene);
     for (let i = 0; i < 40; i++) {
       const p = M(SPHERE, (scene.ground.ink + 1) % n, 'dense', 0.5);
-      const x = (rand() - 0.5) * (TANK.w - 0.4), z = (rand() - 0.5) * (TANK.d - 0.4), r = 0.04 + rand() * 0.06;
+      const [x, z] = randomIn(rand, T.floor, 0.25), r = 0.04 + rand() * 0.06;
       p.scale.set(r * 1.4, r * 0.7, r);
       p.position.set(x, sandAt(x, z), z);
       world.add(p);
     }
-    const water = new THREE.Mesh(box(TANK.w, TANK.h - 0.3, TANK.d), inkMat(scene.water.ink, scene.water.tone, 0, true));
-    water.position.y = (TANK.h - 0.3) / 2 + 0.3;
-    water.renderOrder = 10;
-    world.add(water);
-    if (scene.water.gradient) {
-      const deep = new THREE.Mesh(box(TANK.w - 0.01, TANK.h * 0.4, TANK.d - 0.01), inkMat(scene.water.ink, 'light', 0, true));
-      deep.position.y = TANK.h * 0.2 + 0.01;
-      deep.renderOrder = 11;
-      world.add(deep);
-    }
 
+    // decor along the back half of the floor
+    const span = T.box ? T.w / 2 - 0.6 : radiusAt(T.floor) * 0.7;
     for (const spec of scene.decor) {
       for (let i = 0; i < spec.count; i++) {
-        const x = -TANK.w / 2 + 0.6 + ((i + rand()) / spec.count) * (TANK.w - 1.2);
-        const z = -TANK.d / 2 + 0.4 + rand() * TANK.d * 0.55;
+        const x = -span + ((i + rand()) / spec.count) * span * 2;
+        const back = T.box ? T.d / 2 - 0.4 : Math.sqrt(Math.max(0, span * span - x * x));
+        const z = -back + rand() * back * (T.box ? 1.1 : 0.9);
         const d = DECOR[spec.type](ctx, spec, x, z);
         world.add(d.g);
         if (d.update) updaters.push(d.update);
@@ -184,10 +204,11 @@ export function createTank(canvas) {
         g.scale.setScalar(spec.size * (0.85 + rand() * 0.3));
         const a = {
           ...body, spec, kind, phase: rand() * Math.PI * 2,
-          pos: new THREE.Vector3((rand() - 0.5) * 2 * BOUNDS.x, 1 + rand() * (BOUNDS.top - 1.2), (rand() - 0.5) * 2 * BOUNDS.z),
+          pos: new THREE.Vector3(0, T.floor + 0.6 + rand() * (T.top - T.floor - 0.6), 0),
           heading: rand() * Math.PI * 2, dir: rand() < 0.5 ? -1 : 1,
           speed: SPEED[spec.type] * (spec.pace === 'lively' ? 1.5 : 0.75) * (0.8 + rand() * 0.4),
         };
+        [a.pos.x, a.pos.z] = randomIn(rand, a.pos.y, 0.8);
         a.baseY = a.pos.y;
         if (spec.type === 'neon_tetra') {
           if (leader) Object.assign(a, { leader, off: new THREE.Vector3((rand() - 0.5) * 1.4, (rand() - 0.5) * 0.6, (rand() - 0.5) * 1.0) });
@@ -222,13 +243,13 @@ export function createTank(canvas) {
           a.baseY += (a.leader.baseY + a.off.y - a.baseY) * Math.min(1, dt * 1.5);
         } else {
           a.heading += (Math.random() - 0.5) * dt * 1.5;
-          if (Math.abs(p.x) > BOUNDS.x * 0.85 || Math.abs(p.z) > BOUNDS.z * 0.8) desired = Math.atan2(-p.z, -p.x);
-          if (Math.random() < dt * 0.2) a.baseY = 1 + Math.random() * (BOUNDS.top - 1.2);
+          if (nearWall(p)) desired = Math.atan2(-p.z, -p.x);
+          if (Math.random() < dt * 0.2) a.baseY = T.floor + 0.6 + Math.random() * (T.top - T.floor - 0.6);
         }
         if (desired !== null) a.heading += angleDiff(a.heading, desired) * Math.min(1, dt * 2.5);
         p.x += Math.cos(a.heading) * speed * dt;
         p.z += Math.sin(a.heading) * speed * dt;
-        a.baseY = Math.min(BOUNDS.top, Math.max(1, a.baseY));
+        a.baseY = Math.min(T.top, Math.max(T.floor + 0.5, a.baseY));
         p.y += (a.baseY + Math.sin(t * 1.3 + a.phase) * 0.06 - p.y) * Math.min(1, dt * 2);
         a.g.rotation.y = -a.heading;
         a.g.rotation.z = Math.max(-0.4, Math.min(0.4, (a.baseY - p.y) * 1.5));
@@ -239,14 +260,14 @@ export function createTank(canvas) {
       } else {
         a.moving = a.spec.type === 'snail' || Math.sin(t * 0.7 + a.phase) > -0.2;
         if (a.moving) p.x += a.dir * a.speed * dt;
-        if (p.x > BOUNDS.x) a.dir = -1;
-        if (p.x < -BOUNDS.x) a.dir = 1;
+        const xlim = T.box ? T.w / 2 - 0.6 : Math.sqrt(Math.max(0, (radiusAt(T.floor) - 0.5) ** 2 - p.z * p.z));
+        if (p.x > xlim) a.dir = -1;
+        if (p.x < -xlim) a.dir = 1;
         const hop = a.spec.type === 'shrimp' ? Math.pow(Math.max(0, Math.sin(t * 1.3 + a.phase)), 8) * 0.35 : 0;
         p.y = sandAt(p.x, p.z) + hop;
         if (a.spec.type !== 'crab') a.g.rotation.y = a.dir > 0 ? 0 : Math.PI;
       }
-      p.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, p.x));
-      p.z = Math.max(-BOUNDS.z, Math.min(BOUNDS.z, p.z));
+      clampIn(p, a.kind === 'bottom' ? 0.5 : 0.7);
       a.g.position.copy(p);
       a.animate?.(t, a);
     }
@@ -262,7 +283,7 @@ export function createTank(canvas) {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
     const hit = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, -1), 0), new THREE.Vector3());
-    if (!hit || Math.abs(hit.x) > BOUNDS.x || hit.y < 0.8 || hit.y > TANK.h) return;
+    if (!hit || hit.y < T.floor + 0.3 || hit.y > T.water || Math.abs(hit.x) > (T.box ? T.w / 2 : radiusAt(hit.y)) - 0.3) return;
     if (food) world.remove(food.g);
     const D = current.inks.map((k) => luminance(INKS[k].hex)).reduce((b, l, i, all) => (l < all[b] ? i : b), 0);
     const g = new THREE.Group();
@@ -290,6 +311,69 @@ export function createTank(canvas) {
   });
 
   return { setScene, get scene() { return current; } };
+}
+
+// ---------- tank shells: frame, sand and water for each shape ----------
+
+function buildTank({ M, own, D }, world, scene) {
+  const add = (m, y = 0) => ((m.position.y = y), world.add(m), m);
+  const water = (geo, y, tone, order) => {
+    const m = new THREE.Mesh(geo, inkMat(scene.water.ink, tone, 0, true));
+    m.renderOrder = order;
+    return add(m, y);
+  };
+  const sandTop = (geo) => {
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setY(i, sandAt(p.getX(i), p.getZ(i)));
+    geo.computeVertexNormals();
+    return add(M(geo, scene.ground.ink, scene.ground.tone, 0.35));
+  };
+  const disc = (r, sides) => own(new THREE.CircleGeometry(r, sides, Math.PI / 2)).rotateX(-Math.PI / 2);
+  const ring = (r, sides) => own(new THREE.RingGeometry(0.01, r, sides, 12, Math.PI / 2)).rotateX(-Math.PI / 2); // inner rings so the sand can ripple
+
+  if (T.box) {
+    const box = (w, h, d) => own(new THREE.BoxGeometry(w, h, d));
+    add(M(box(T.w + 0.4, 0.35, T.d + 0.4), D, 'solid', 0.4), -0.18);
+    add(M(box(T.w + 0.3, 0.12, T.d + 0.3), D, 'solid', 0.3), T.h);
+    for (const x of [-1, 1]) for (const z of [-1, 1]) add(M(box(0.07, T.h, 0.07), D, 'solid', 0)).position.set((x * T.w) / 2, T.h / 2, (z * T.d) / 2);
+    const sand = own(new THREE.BoxGeometry(T.w, T.floor, T.d, 48, 1, 24)).translate(0, T.floor / 2, 0);
+    const p = sand.attributes.position;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) > T.floor - 0.1) p.setY(i, sandAt(p.getX(i), p.getZ(i)));
+    sand.computeVertexNormals();
+    add(M(sand, scene.ground.ink, scene.ground.tone, 0.35));
+    water(box(T.w, T.h - 0.3, T.d), (T.h - 0.3) / 2 + 0.3, scene.water.tone, 10);
+    if (scene.water.gradient) water(box(T.w - 0.01, T.h * 0.4, T.d - 0.01), T.h * 0.2 + 0.01, 'light', 11);
+  } else if (!T.bowl) {
+    const cyl = (r1, r2, h, open = false) => own(new THREE.CylinderGeometry(r1, r2, h, T.sides, 1, open));
+    add(M(cyl(T.r + 0.25, T.r + 0.32, 0.35), D, 'solid', 0.4), -0.18);
+    if (T.sides === 6) {
+      // CylinderGeometry puts corner k at angle k*60deg from +z
+      const c = Array.from({ length: 6 }, (_, k) => [T.r * Math.sin((k * Math.PI) / 3), T.r * Math.cos((k * Math.PI) / 3)]);
+      c.forEach(([x, z], k) => {
+        add(M(own(new THREE.BoxGeometry(0.07, T.h, 0.07)), D, 'solid', 0)).position.set(x, T.h / 2, z);
+        const [x2, z2] = c[(k + 1) % 6];
+        const bar = add(M(own(new THREE.BoxGeometry(0.1, 0.12, T.r + 0.1)), D, 'solid', 0.3), T.h);
+        bar.position.x = (x + x2) / 2;
+        bar.position.z = (z + z2) / 2;
+        bar.rotation.y = Math.atan2(x2 - x, z2 - z);
+      });
+    } else add(M(own(new THREE.TorusGeometry(T.r, 0.07, 6, 64)).rotateX(Math.PI / 2), D, 'solid', 0.3), T.h);
+    add(M(cyl(T.r, T.r, T.floor, true), scene.ground.ink, scene.ground.tone, 0.35), T.floor / 2);
+    sandTop(ring(T.r, T.sides));
+    water(cyl(T.r, T.r, T.h - 0.3), (T.h - 0.3) / 2 + 0.3, scene.water.tone, 10);
+    if (scene.water.gradient) water(cyl(T.r - 0.01, T.r - 0.01, T.h * 0.4), T.h * 0.2 + 0.01, 'light', 11);
+  } else {
+    const theta = (y) => Math.acos(Math.max(-1, Math.min(1, (y - T.cy) / T.r)));
+    const shell = (r, from) => own(new THREE.SphereGeometry(r, 48, 24, 0, Math.PI * 2, from, Math.PI - from));
+    add(M(own(new THREE.CylinderGeometry(1.3, 1.6, 0.3, 48)), D, 'solid', 0.4), 0);
+    const lipY = T.water + 0.3;
+    add(M(own(new THREE.TorusGeometry(radiusAt(lipY), 0.07, 6, 64)).rotateX(Math.PI / 2), D, 'solid', 0.3), lipY);
+    add(M(shell(T.r - 0.02, theta(T.floor)), scene.ground.ink, scene.ground.tone, 0.35), T.cy);
+    sandTop(ring(radiusAt(T.floor) - 0.02, 48));
+    water(shell(T.r, theta(T.water)), T.cy, scene.water.tone, 10);
+    water(disc(radiusAt(T.water), 48), T.water, scene.water.tone, 10);
+    if (scene.water.gradient) water(shell(T.r - 0.01, theta(T.floor + (T.water - T.floor) * 0.45)), T.cy, 'light', 11);
+  }
 }
 
 // ---------- shared geometry ----------
@@ -510,7 +594,7 @@ const BUILD = {
 
 const DECOR = {
   kelp({ M, rand }, spec, x, z) {
-    const h = 2 + rand() * 1.6, n = 12, ph = rand() * 6, base = sandAt(x, z) - 0.05;
+    const h = Math.min(2 + rand() * 1.6, T.top - T.floor + 0.2), n = 12, ph = rand() * 6, base = sandAt(x, z) - 0.05;
     const c = chain(M, n, 0.07, spec.ink, spec.tone, 0.6);
     const leaves = Array.from({ length: 4 }, (_, i) => part(M, SPHERE, spec.ink, spec.tone, [0, 0, 0], [0.22, 0.06, 0.08]));
     const g = new THREE.Group();
@@ -611,11 +695,11 @@ const DECOR = {
       list.push([b, rand(), rand() * 6]);
       g.add(b);
     }
-    const span = TANK.h - 0.9;
+    const span = T.water - T.floor - 0.3;
     return {
       g,
       update(t) {
-        for (const [b, y0, ph] of list) b.position.set(x + Math.sin(t * 3 + ph) * 0.06, 0.6 + ((y0 * span + t * 0.5) % span), z);
+        for (const [b, y0, ph] of list) b.position.set(x + Math.sin(t * 3 + ph) * 0.06, T.floor + 0.1 + ((y0 * span + t * 0.5) % span), z);
       },
     };
   },

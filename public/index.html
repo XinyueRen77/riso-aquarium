@@ -16,6 +16,20 @@
   </script>
 </head>
 <body>
+  <div id="intro" class="intro" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <div class="intro-inner">
+      <div class="drops" aria-hidden="true"><i></i><i></i><i></i></div>
+      <h1 id="intro-title" class="intro-title"><span>RISO</span> <span>AQUARIUM</span></h1>
+      <p class="intro-lede">A print studio where an AI printer makes you a <b>living aquarium</b>, printed in riso ink.</p>
+      <ol class="intro-steps">
+        <li><b>Tell it</b> who the tank is for and how it should feel. Any language works.</li>
+        <li><b>It prints a proof</b>: up to 3 inks, fish and little creatures, plants, and a tank shape from fishbowl to hexagon.</li>
+        <li><b>Play and revise</b>: turn the tank, drop food, ask for changes, then export your print.</li>
+      </ol>
+      <button id="enter" class="btn primary big">Start printing →</button>
+      <span class="intro-fish" aria-hidden="true">&gt;&lt;(((°&gt;</span>
+    </div>
+  </div>
   <header>
     <div class="brand">
       <span class="stamp" aria-hidden="true"><i></i><i></i></span>
@@ -25,6 +39,7 @@
       </div>
     </div>
     <div class="actions">
+      <button id="about" class="btn">Intro</button>
       <button id="info" class="btn">How it works</button>
       <button id="save" class="btn" title="Download this conversation and every proof as JSON">Save session</button>
       <button id="export" class="btn primary">Export print ↓</button>
@@ -33,7 +48,7 @@
 
   <main>
     <aside class="chat">
-      <div class="chat-head"><h2>The Printer</h2><span id="stage" class="pill">asking</span></div>
+      <div class="chat-head"><h2>The Printer</h2><span class="head-right"><span id="stage" class="pill">asking</span><button id="clear" class="btn small" title="Clear the conversation (proofs stay)">Clear chat</button></span></div>
       <div id="log" class="messages" aria-live="polite"></div>
       <div class="quick" id="quick"></div>
       <form id="form">
@@ -43,7 +58,7 @@
     </aside>
 
     <section class="stage">
-      <div class="drums" id="drums"></div>
+      <div class="toolbar"><div class="drums" id="drums" aria-label="Inks: click a drum to change it"></div><div id="inkpicker" class="inkpicker" hidden></div><div class="shapes" id="shapes" aria-label="Tank shape"><span>Tank</span></div></div>
       <figure class="print">
         <canvas id="tank" aria-label="3D riso aquarium print. Drag to turn the tank, click the water to drop food."></canvas>
         <figcaption>

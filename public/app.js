@@ -7,22 +7,46 @@ const tank = createTank(canvas);
 const history = []; // what the model sees: {role: 'user'|'model', text}
 const proofs = [];
 let busy = false;
+let edited = null; // a hand-edited recipe, passed to the printer with the next message
 
 // Standard opening prompts, also used as the eval set (docs/evals.md).
 const QUICK = ['I want a calm tank for my desk', '想要一个热闹的热带鱼缸', 'Surprise me', 'Six colors, lots of fish!'];
+const SHAPES = { rectangle: 'Rectangle', tall: 'Tall', wide: 'Wide', cube: 'Cube', cylinder: 'Cylinder', hexagon: 'Hexagon', bowl: 'Fishbowl' };
 
 show(sanitize(SAMPLE).scene, 'SAMPLE');
-bubble('model', "Hi, I'm the printer. Tell me about the aquarium you'd like and I'll pull a riso proof. Who's it for, and what should it feel like?");
+greet();
 for (const q of QUICK) {
   const b = document.createElement('button');
   b.textContent = q;
   b.onclick = () => send(q);
   $('#quick').append(b);
 }
+// Shape and ink buttons edit the print by hand; nothing is sent until the next message.
+for (const [key, name] of Object.entries(SHAPES)) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.dataset.shape = key;
+  b.onclick = () => tank.scene.tank !== key && handEdit({ ...tank.scene, tank: key }, `tank shape changed to ${name}`);
+  $('#shapes').append(b);
+}
+$('#clear').onclick = () => {
+  if (busy) return;
+  history.length = 0;
+  edited = tank.scene;
+  $('#log').innerHTML = '';
+  greet();
+  stage();
+  note('chat cleared (proofs kept)');
+};
 
 $('#form').onsubmit = (e) => (e.preventDefault(), send($('#input').value));
 $('#input').onkeydown = (e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send($('#input').value));
 $('#info').onclick = () => $('#sys').showModal();
+const closeIntro = () => ($('#intro').classList.add('gone'), $('#input').focus());
+$('#enter').onclick = closeIntro;
+$('#intro').onkeydown = (e) => e.key === 'Escape' && closeIntro();
+$('#about').onclick = () => ($('#intro').classList.remove('gone'), $('#enter').focus());
+$('#enter').focus();
 $('#export').onclick = exportPrint;
 $('#save').onclick = () => download(
   URL.createObjectURL(new Blob([JSON.stringify({ saved: new Date().toISOString(), history, proofs: proofs.map(({ thumb, ...p }) => p) }, null, 2)], { type: 'application/json' })),
@@ -35,8 +59,11 @@ async function send(text) {
   busy = true;
   $('#send').disabled = true;
   $('#input').value = '';
-  history.push({ role: 'user', text });
-  bubble('user', text);
+  bubble('user', text, history.length);
+  history.push({ role: 'user', text: edited ? `${text}
+
+(I edited the print by hand. Current recipe, keep these inks and tank: ${JSON.stringify(edited)})` : text });
+  edited = null;
   const typing = bubble('model typing', 'mixing ink…');
   try {
     const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history }) });
@@ -69,12 +96,45 @@ async function send(text) {
 function show(scene, label) {
   tank.setScene(scene);
   $('#drums').innerHTML = scene.inks
-    .map((k, i) => `<span class="drum"><i style="background:${INKS[k].hex}"></i>D${i + 1} · ${INKS[k].name}</span>`)
+    .map((k, i) => `<button class="drum" data-i="${i}" title="Change this ink"><i style="background:${INKS[k].hex}"></i>D${i + 1} · ${INKS[k].name} ✎</button>`)
     .join('');
+  $('#drums').querySelectorAll('.drum').forEach((b) => (b.onclick = () => pickInk(+b.dataset.i, b)));
   $('#title').textContent = scene.title;
   $('#swatches').innerHTML = scene.inks.map((k) => `<i style="background:${INKS[k].hex}"></i>`).join('');
-  $('#colophon').textContent = `Riso Aquarium · ${scene.inks.length} drums · ${label}`;
+  $('#colophon').textContent = `Riso Aquarium · ${scene.inks.length} drums · ${SHAPES[scene.tank]} · ${label}`;
+  document.querySelectorAll('#shapes button').forEach((b) => b.classList.toggle('on', b.dataset.shape === scene.tank));
 }
+
+// Swap a drum for another riso ink by hand. Picking an ink that is already on another drum swaps the two.
+function pickInk(i, anchor) {
+  const box = $('#inkpicker');
+  if (!box.hidden && box.dataset.i === String(i)) return (box.hidden = true);
+  box.dataset.i = i;
+  box.innerHTML = Object.entries(INKS)
+    .map(([k, ink]) => `<button data-k="${k}" title="${ink.name}" class="${tank.scene.inks[i] === k ? 'on' : ''}"><i style="background:${ink.hex}"></i>${ink.name}</button>`)
+    .join('');
+  box.querySelectorAll('button').forEach((b) => (b.onclick = () => {
+    box.hidden = true;
+    const scene = structuredClone(tank.scene), k = b.dataset.k, j = scene.inks.indexOf(k);
+    if (j === i) return;
+    if (j >= 0) scene.inks[j] = scene.inks[i];
+    scene.inks[i] = k;
+    handEdit(scene, `drum ${i + 1} changed to ${INKS[k].name}`);
+  }));
+  box.style.left = `${anchor.offsetLeft}px`;
+  box.style.top = `${anchor.offsetTop + anchor.offsetHeight + 6}px`;
+  box.hidden = false;
+}
+function handEdit(scene, what) {
+  if (busy) return;
+  const label = `EDIT ${proofs.length + 1}`;
+  show(scene, label);
+  addProof(scene, label, scene);
+  note(`${label}: ${what} by hand`);
+  edited = scene;
+}
+document.addEventListener('click', (e) => !e.target.closest('#inkpicker, .drum') && ($('#inkpicker').hidden = true));
+document.addEventListener('keydown', (e) => e.key === 'Escape' && ($('#inkpicker').hidden = true));
 
 // The print as a file: the 3D frame plus title and colophon, on paper.
 function exportPrint() {
@@ -119,10 +179,31 @@ function mark(fig) {
   document.querySelectorAll('.proofs figure').forEach((f) => f.classList.toggle('on', f === fig));
 }
 
-function bubble(cls, text) {
+function greet() {
+  bubble('model', "Hi, I'm the printer. Tell me about the aquarium you'd like and I'll pull a riso proof. Who's it for, and what should it feel like? Any tank shape works too: tall, round, a fishbowl…");
+}
+
+// A user bubble can be deleted: it and everything after it leave the chat and the model's history.
+function bubble(cls, text, at) {
   const d = document.createElement('div');
   d.className = `msg ${cls}`;
   d.textContent = text;
+  if (at !== undefined) {
+    const x = document.createElement('button');
+    x.className = 'del';
+    x.title = 'Delete this message and everything after it';
+    x.setAttribute('aria-label', x.title);
+    x.textContent = '×';
+    x.onclick = () => {
+      if (busy) return;
+      history.length = at;
+      while (d.nextSibling) d.nextSibling.remove();
+      d.remove();
+      stage();
+      note('deleted a message and the replies after it');
+    };
+    d.append(x);
+  }
   $('#log').append(d);
   d.scrollIntoView({ block: 'end' });
   return d;

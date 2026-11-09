@@ -20,11 +20,13 @@ export const INKS = {
 };
 
 export const CREATURE_TYPES = ['goldfish', 'clownfish', 'neon_tetra', 'angelfish', 'betta', 'pufferfish', 'turtle', 'jellyfish', 'seahorse', 'shrimp', 'crab', 'snail'];
+export const TANK_SHAPES = ['rectangle', 'tall', 'wide', 'cube', 'cylinder', 'hexagon', 'bowl'];
 export const DECOR_TYPES = ['kelp', 'seagrass', 'coral', 'rock', 'castle', 'shell', 'starfish', 'bubbles'];
 const TONES = ['light', 'mid', 'dense', 'solid'];
 
 export const SAMPLE = {
   title: 'Sample Tank',
+  tank: 'rectangle',
   inks: ['fluorescent_pink', 'aqua', 'federal_blue'],
   water: { ink: 1, tone: 'light', gradient: true },
   ground: { ink: 0, tone: 'mid' },
@@ -81,6 +83,7 @@ export function sanitize(input) {
 
   const scene = {
     title: String(s.title || 'Untitled Tank').slice(0, 24),
+    tank: TANK_SHAPES.includes(s.tank) ? s.tank : (s.tank !== undefined && warnings.push(`unknown tank shape "${s.tank}", used rectangle`), 'rectangle'),
     inks,
     water: { ink: ink(s.water?.ink, 'water'), tone: tone(s.water?.tone, 'light', 'water'), gradient: !!s.water?.gradient },
     ground: { ink: ink(s.ground?.ink, 'ground'), tone: tone(s.ground?.tone, 'mid', 'ground') },
