@@ -40,7 +40,8 @@ $('#clear').onclick = () => {
 };
 
 $('#form').onsubmit = (e) => (e.preventDefault(), send($('#input').value));
-$('#input').onkeydown = (e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send($('#input').value));
+// Enter sends, except while an IME (pinyin etc.) is composing: that Enter picks the characters.
+$('#input').onkeydown = (e) => e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && (e.preventDefault(), send($('#input').value));
 $('#info').onclick = () => $('#sys').showModal();
 const closeIntro = () => ($('#intro').classList.add('gone'), $('#input').focus());
 $('#enter').onclick = closeIntro;
