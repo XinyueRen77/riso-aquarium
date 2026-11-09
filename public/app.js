@@ -9,8 +9,8 @@ const proofs = [];
 let busy = false;
 let edited = null; // a hand-edited recipe, passed to the printer with the next message
 
-// Standard opening prompts, also used as the eval set (docs/evals.md).
-const QUICK = ['I want a calm tank for my desk', '想要一个热闹的热带鱼缸', 'Surprise me', 'Six colors, lots of fish!'];
+// Standard opening prompts, also used as the eval set (docs/evals.md; type the Chinese E2 prompt by hand).
+const QUICK = ['I want a calm tank for my desk', 'A lively tropical reef, please', 'Surprise me', 'Six colors, lots of fish!'];
 const SHAPES = { rectangle: 'Rectangle', tall: 'Tall', wide: 'Wide', cube: 'Cube', cylinder: 'Cylinder', hexagon: 'Hexagon', bowl: 'Fishbowl' };
 
 show(sanitize(SAMPLE).scene, 'SAMPLE');
@@ -40,12 +40,14 @@ $('#clear').onclick = () => {
 };
 
 $('#form').onsubmit = (e) => (e.preventDefault(), send($('#input').value));
-// Enter sends, except while an IME (pinyin etc.) is composing: that Enter picks the characters.
-$('#input').onkeydown = (e) => e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229 && (e.preventDefault(), send($('#input').value));
+// Enter sends, except while an IME is composing. Block body on purpose: an on* handler that returns false cancels the key.
+$('#input').onkeydown = (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) (e.preventDefault(), send($('#input').value));
+};
 $('#info').onclick = () => $('#sys').showModal();
 const closeIntro = () => ($('#intro').classList.add('gone'), $('#input').focus());
 $('#enter').onclick = closeIntro;
-$('#intro').onkeydown = (e) => e.key === 'Escape' && closeIntro();
+$('#intro').onkeydown = (e) => { if (e.key === 'Escape') closeIntro(); };
 $('#about').onclick = () => ($('#intro').classList.remove('gone'), $('#enter').focus());
 $('#enter').focus();
 $('#export').onclick = exportPrint;
