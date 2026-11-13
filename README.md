@@ -18,7 +18,10 @@
 | `public/riso.js` | 油墨表 + 校验器 |
 | `public/tank3d.js` | 3D 印刷机：three.js 场景 + 生物动画 + riso 半调着色器 |
 | `public/app.js` | 聊天、打样记录、press log、导出 |
-| `docs/` | System card v1、eval 测试集、system diagram |
+| [`docs/system-card-v1.md`](docs/system-card-v1.md) | System card v1（第一版，未改动） |
+| [`docs/system-card-v2.md`](docs/system-card-v2.md) | System card v2（手动编辑、鱼缸形状，以及和 v1 的区别） |
+| [`docs/evals.md`](docs/evals.md) | Eval 测试集、测试结果、出过的问题和修复 |
+| [`docs/system-diagram.md`](docs/system-diagram.md) | System diagram |
 
 ## 本地运行
 
