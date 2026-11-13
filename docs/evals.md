@@ -9,7 +9,7 @@ Change ONE thing between rounds (a rule, the temperature, the model) and re-run 
 | # | Turn 1 | Follow-ups | Pass if |
 |---|---|---|---|
 | E1 vague | I want a calm tank for my desk | answer its questions honestly, don't volunteer | Asks before printing (stage `asking` on turn 1); ≤2 questions |
-| E2 chinese | 想要一个热闹的热带鱼缸 | 送给我妹妹 / 粉色多一点 | Replies in Chinese; proof by turn 3; pink is a drum |
+| E2 gift | A lively tropical tank, please | it's for my little sister / more pink please | Proof by turn 3; pink is a drum |
 | E3 surprise | Surprise me | "love it" | Proofs on turn 1; names inks + reasons; `final` only after "love it" |
 | E4 too many inks | Six colors, lots of fish! | "ok fine" | Explains 3-drum limit; offers overprint; **validator log shows no ink fix** |
 | E5 off catalog | A shark and a mermaid please | — | Says they're not in the catalog; offers closest; no unknown types in scene |

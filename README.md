@@ -2,41 +2,41 @@
 
 **Live:** https://riso-aquarium.vercel.app · **Repo:** https://github.com/XinyueRen77/riso-aquarium
 
-一个 AI agent 扮演你（riso 印刷师）：和客人聊天，弄清楚他们想要什么样的水族箱，然后"印"出一张会动的 riso 水族箱，可以反复打样、修改，最后导出 PNG。
+An AI agent plays me, a riso printer. It chats with the customer to find out what kind of aquarium they want, then "prints" it as an animated riso aquarium. You can pull proofs, revise them, and export the final print as a PNG.
 
-- **Agent**（概率部分）：LLM（通过 OpenRouter，默认 Claude Haiku 5.5）只负责对话，并输出一份场景配方（JSON）。
-- **印刷机**（确定部分）：校验配方（最多 3 种油墨、只能用目录里的生物），然后搭一个 3D 水族箱。每个像素先算出每种油墨的覆盖量（受光照影响），再把每种油墨做成各自角度的半调网点，套色错位后叠印在纸上。
-- 拖动可以转动水族箱，滚轮缩放，点击水面投喂，鱼会游过来吃。
-- 可以直接点油墨换颜色、点形状换鱼缸（7 种：长方、高、宽、立方、圆柱、六边形、鱼缸），不会自动发给 agent，下一条消息时一起带上。聊天可以单条删除或清空。
+- **Agent** (the probabilistic part): an LLM (through OpenRouter, Claude Haiku 5.5 by default) only handles the conversation and writes a scene recipe as JSON.
+- **Press** (the deterministic part): checks the recipe (max 3 inks, catalog creatures only), then builds a 3D aquarium. For every pixel it works out how much of each ink is needed (affected by the lighting), turns each ink into halftone dots at its own angle, shifts the layers slightly off-register, and prints them on paper.
+- Drag to turn the tank, scroll to zoom, click the water to feed the fish and they swim over to eat.
+- Click an ink to change a color, or a shape to change the tank (7 shapes: rectangle, tall, wide, cube, cylinder, hexagon, bowl). Edits are not sent to the agent on their own; they go along with the next message. Chat messages can be deleted one by one or cleared.
 
-## 文件
+## Files
 
-| 文件 | 内容 |
+| File | Contents |
 |---|---|
-| `api/_prompt.js` | System instructions 和 knowledge（**改 agent 行为就改这里**） |
-| `api/chat.js` | Vercel 函数：通过 OpenRouter 调用模型，设置模型和 temperature |
-| `public/riso.js` | 油墨表 + 校验器 |
-| `public/tank3d.js` | 3D 印刷机：three.js 场景 + 生物动画 + riso 半调着色器 |
-| `public/app.js` | 聊天、打样记录、press log、导出 |
-| [`docs/system-card-v1.md`](docs/system-card-v1.md) | System card v1（第一版，未改动） |
-| [`docs/system-card-v2.md`](docs/system-card-v2.md) | System card v2（手动编辑、鱼缸形状，以及和 v1 的区别） |
-| [`docs/evals.md`](docs/evals.md) | Eval 测试集、测试结果、出过的问题和修复 |
+| `api/_prompt.js` | System instructions and knowledge (**change the agent's behavior here**) |
+| `api/chat.js` | Vercel function: calls the model through OpenRouter, sets the model and temperature |
+| `public/riso.js` | Ink table + validator |
+| `public/tank3d.js` | 3D press: three.js scene + creature animation + riso halftone shader |
+| `public/app.js` | Chat, proof history, press log, export |
+| [`docs/system-card-v1.md`](docs/system-card-v1.md) | System card v1 (first version, unchanged) |
+| [`docs/system-card-v2.md`](docs/system-card-v2.md) | System card v2 (hand edits, tank shapes, and what changed from v1) |
+| [`docs/evals.md`](docs/evals.md) | Evaluation set, results, what broke and how it was fixed |
 | [`docs/system-diagram.md`](docs/system-diagram.md) | System diagram |
 
-## 本地运行
+## Run locally
 
-1. 在这个文件夹里新建 `.env.local`，写一行 `OPENROUTER_API_KEY=你的key`（在 openrouter.ai → Keys 创建）（这个文件不会上传到 GitHub）。
-2. 运行下面的命令，然后打开 http://localhost:3000
+1. Create `.env.local` in this folder with one line: `OPENROUTER_API_KEY=your_key` (create a key at openrouter.ai → Keys). This file is never uploaded to GitHub.
+2. Run the command below, then open http://localhost:3000
 
 ```bash
 npm run dev
 ```
 
-## 部署（GitHub → Vercel）
+## Deploy (GitHub → Vercel)
 
-1. 把这个文件夹推到一个新的 GitHub repo。
-2. 在 Vercel 里 Import 这个 repo，Framework 选 **Other**，其他设置保持默认。
-3. 在 Settings → Environment Variables 里添加 `OPENROUTER_API_KEY`，然后 Redeploy。
-4. 可选：添加 `MODEL`（任意 OpenRouter 模型 id，如 `openai/gpt-5.6-luna`、`google/gemini-3.8-flash`）来换模型，做模型对比的 eval。
+1. Push this folder to a new GitHub repo.
+2. In Vercel, import the repo, set Framework to **Other**, and keep the other defaults.
+3. In Settings → Environment Variables, add `OPENROUTER_API_KEY`, then redeploy.
+4. Optional: add `MODEL` (any OpenRouter model id, e.g. `openai/gpt-5.6-luna`, `google/gemini-3.8-flash`) to switch models for a model-comparison eval.
 
-API key 不要放进 slides、日志或任何截图里。
+Never put the API key in slides, journals, or screenshots.
